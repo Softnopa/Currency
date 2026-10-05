@@ -29,6 +29,19 @@ Open http://localhost:3000 and log in.
 3. Under **Environment Variables**, add the same four values as `.env.local`.
 4. Deploy. The cron job in [vercel.json](vercel.json) calls `/api/rates/refresh` every day at 09:00 Tashkent time. Rates are also refreshed when someone opens the site if they are more than 6 hours old.
 
+## Updating an existing database
+
+If you ran `schema.sql` before a feature was added, run the matching file from [supabase/migrations/](supabase/migrations/) in the SQL Editor once:
+
+- [002_archive.sql](supabase/migrations/002_archive.sql) — archive for trucks (Settings → Ma'lumotlar).
+
+## Settings page (⚙️ Sozlamalar)
+
+- **Ko'rinish:** theme colour, light/dark/auto mode, font size, language. Saved per device (phone and computer can differ).
+- **Hisob-kitob:** which currency the expenses field starts with.
+- **Ma'lumotlar:** tick trucks to archive, restore or delete; download everything as a CSV that opens in Excel.
+- **Hisob:** change password, log out.
+
 ## How the numbers are calculated
 
 - Fruit row: `boxes × price per box (¥)` → ÷ (¥ per $) → × (so'm per $).

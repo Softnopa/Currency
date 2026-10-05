@@ -1,26 +1,97 @@
 @import "tailwindcss";
 
+/*
+ * Theme: the layout puts the chosen colour (--brand-light / --brand-dark),
+ * font size and data-mode="light|dark|auto" on <html>. Every other colour
+ * is derived from those here.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f6f5f0;
+  --surface: #ffffff;
+  --foreground: #1c1f1a;
+  --muted: #6b6f66;
+  --border: #e3e1d8;
+  --primary: var(--brand-light, #1f6b3a);
+  --on-primary: #ffffff;
+  --primary-hover: color-mix(in srgb, var(--primary) 85%, black);
+  --accent: #b45309;
+  --accent-soft: #fdf3e3;
+  --danger: #b42318;
+  --danger-soft: #fdecea;
+  color-scheme: light;
+}
+
+:root[data-mode="dark"] {
+  --background: #121412;
+  --surface: #1b1e1b;
+  --foreground: #e8eae5;
+  --muted: #a0a59b;
+  --border: #30352f;
+  --primary: var(--brand-dark, #4fb878);
+  --on-primary: #0d120e;
+  --primary-hover: color-mix(in srgb, var(--primary) 85%, white);
+  --accent: #f0a54a;
+  --accent-soft: #3a2a14;
+  --danger: #f27066;
+  --danger-soft: #3b1a17;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root[data-mode="auto"] {
+    --background: #121412;
+    --surface: #1b1e1b;
+    --foreground: #e8eae5;
+    --muted: #a0a59b;
+    --border: #30352f;
+    --primary: var(--brand-dark, #4fb878);
+    --on-primary: #0d120e;
+    --primary-hover: color-mix(in srgb, var(--primary) 85%, white);
+    --accent: #f0a54a;
+    --accent-soft: #3a2a14;
+    --danger: #f27066;
+    --danger-soft: #3b1a17;
+    color-scheme: dark;
+  }
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-on-primary: var(--on-primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-soft: color-mix(in srgb, var(--primary) 13%, var(--surface));
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --font-sans: var(--font-inter);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-inter), system-ui, sans-serif;
+}
+
+@layer components {
+  .field {
+    @apply w-full rounded-xl border border-border bg-surface px-3.5 py-3 text-lg tabular-nums outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15;
+  }
+  .label {
+    @apply mb-1.5 block text-sm font-medium text-muted;
+  }
+  .card {
+    @apply rounded-2xl border border-border bg-surface p-4 sm:p-5;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-xl bg-primary px-5 py-3 text-base font-semibold text-on-primary transition hover:bg-primary-hover disabled:opacity-60;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center rounded-xl border border-border bg-surface px-4 py-2.5 text-sm font-medium transition hover:bg-background disabled:opacity-60;
+  }
 }
