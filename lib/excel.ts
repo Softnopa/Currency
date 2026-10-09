@@ -7,7 +7,8 @@ import { calculateSavedTruck, truckTitle, type TruckRow } from "./trucks";
 
 const MONEY = "#,##0.00";
 const WHOLE = "#,##0";
-const KG = "#,##0.##";
+// "General" shows 4 / 10.9 / 279.5 — "#,##0.##" would print "4." with a stray dot.
+const KG = "General";
 const HEADER_FILL: ExcelJS.Fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE2EFDA" } };
 const TOTAL_FILL: ExcelJS.Fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFF2CC" } };
 const THIN: Partial<ExcelJS.Borders> = {
@@ -45,7 +46,7 @@ export function addTruckSheet(wb: ExcelJS.Workbook, truck: TruckRow, t: Messages
   const r = calculateSavedTruck(truck);
   const hasTashkent = r.tashkent.CNY > 0;
   const ws = wb.addWorksheet(sheetName(wb, `${formatDate(truck.arrived_at)} ${truckTitle(truck, t.untitled)}`));
-  const lastCol = hasTashkent ? 13 : 10;
+  const lastCol = hasTashkent ? 16 : 12;
 
   // ── Title and rates ─────────────────────────────────────────────────
   const title = [
@@ -83,8 +84,15 @@ export function addTruckSheet(wb: ExcelJS.Workbook, truck: TruckRow, t: Messages
     t.totalKg,
     `${t.expenseShare} (${t.khorgosExpenses}), ¥`,
     `${t.boxAtKhorgos}, ¥`,
+    `${t.boxAtKhorgos}, $`,
+    `${t.boxAtKhorgos}, ${t.som}`,
     ...(hasTashkent
-      ? [`${t.expenseShare} (${t.tashkentExpenses}), ¥`, `${t.boxAtTashkent}, ¥`, `${t.boxAtTashkent}, ${t.som}`]
+      ? [
+          `${t.expenseShare} (${t.tashkentExpenses}), ¥`,
+          `${t.boxAtTashkent}, ¥`,
+          `${t.boxAtTashkent}, $`,
+          `${t.boxAtTashkent}, ${t.som}`,
+        ]
       : []),
   ];
   const hr = ws.getRow(headerRow);
@@ -121,11 +129,14 @@ export function addTruckSheet(wb: ExcelJS.Workbook, truck: TruckRow, t: Messages
       f(`C${n}*D${n}`, it.totalKg),
       f(share(`$F$${khorgosTotalRow}`), it.shareKhorgosCny),
       f(`IF(C${n}=0,0,F${n}+I${n}/C${n})`, it.boxAtKhorgos.CNY),
+      f(`J${n}/${RATE_CNY}`, it.boxAtKhorgos.USD),
+      f(`K${n}*${RATE_UZS}`, it.boxAtKhorgos.UZS),
       ...(hasTashkent
         ? [
             f(share(`$F$${tashkentTotalRow}`), it.shareTashkentCny),
-            f(`IF(C${n}=0,0,J${n}+K${n}/C${n})`, it.boxAtTashkent.CNY),
-            f(`L${n}*${RATE_UZS}/${RATE_CNY}`, it.boxAtTashkent.UZS),
+            f(`IF(C${n}=0,0,J${n}+M${n}/C${n})`, it.boxAtTashkent.CNY),
+            f(`N${n}/${RATE_CNY}`, it.boxAtTashkent.USD),
+            f(`O${n}*${RATE_UZS}`, it.boxAtTashkent.UZS),
           ]
         : []),
     ];
@@ -139,7 +150,7 @@ export function addTruckSheet(wb: ExcelJS.Workbook, truck: TruckRow, t: Messages
   tr.getCell(7).value = sum("G", r.goods.CNY);
   tr.getCell(8).value = sum("H", r.totalKg);
   tr.getCell(9).value = sum("I", r.khorgos.CNY);
-  if (hasTashkent) tr.getCell(11).value = sum("K", r.tashkent.CNY);
+  if (hasTashkent) tr.getCell(13).value = sum("M", r.tashkent.CNY);
   styleRow(tr, 1, lastCol, { bold: true, fill: TOTAL_FILL });
 
   ws.getRow(totalRow + 1).getCell(2).value = `${t.leftKhorgos}: ${truck.left_khorgos_at ? formatDate(truck.left_khorgos_at) : "—"}`;
@@ -206,7 +217,7 @@ export function addTruckSheet(wb: ExcelJS.Workbook, truck: TruckRow, t: Messages
   }
 
   // ── Column formats ──────────────────────────────────────────────────
-  const widths = [5, 28, 12, 12, 12, 14, 14, 12, 16, 16, 16, 16, 18];
+  const widths = [5, 28, 12, 12, 12, 14, 14, 12, 16, 14, 14, 16, 16, 14, 14, 16];
   widths.slice(0, lastCol).forEach((w, i) => (ws.getColumn(i + 1).width = w));
   for (let n = first; n <= totalRow; n++) {
     const row = ws.getRow(n);
@@ -215,8 +226,9 @@ export function addTruckSheet(wb: ExcelJS.Workbook, truck: TruckRow, t: Messages
     row.getCell(6).numFmt = MONEY;
     row.getCell(7).numFmt = MONEY;
     row.getCell(8).numFmt = KG;
-    for (let c = 9; c <= 12; c++) row.getCell(c).numFmt = MONEY;
-    row.getCell(13).numFmt = WHOLE;
+    // Money columns; the so'm ones (L, P) are whole numbers.
+    for (const c of [9, 10, 11, 13, 14, 15]) row.getCell(c).numFmt = MONEY;
+    for (const c of [12, 16]) row.getCell(c).numFmt = WHOLE;
   }
   for (let n = khorgosStart; n <= tashkentTotalRow; n++) {
     ws.getRow(n).getCell(4).numFmt = MONEY;
