@@ -60,7 +60,7 @@ function toCnyValue(amount: number, currency: Currency, truck: TruckRow) {
 export function addTruckSheet(wb: ExcelJS.Workbook, truck: TruckRow, t: Messages) {
   const r = calculateSavedTruck(truck);
   const ws = wb.addWorksheet(sheetName(wb, `${formatDate(truck.arrived_at)} ${truckTitle(truck, t.untitled)}`));
-  const lastCol = 16;
+  const lastCol = 17;
 
   // ── Title and rates ─────────────────────────────────────────────────
   const title = [
@@ -104,6 +104,7 @@ export function addTruckSheet(wb: ExcelJS.Workbook, truck: TruckRow, t: Messages
     `${t.boxAtTashkent}, ¥`,
     `${t.boxAtTashkent}, $`,
     `${t.boxAtTashkent}, ${t.som}`,
+    t.totalAtTashkentSom,
   ];
   const hr = ws.getRow(headerRow);
   hr.values = headers;
@@ -145,6 +146,8 @@ export function addTruckSheet(wb: ExcelJS.Workbook, truck: TruckRow, t: Messages
       f(`IF(C${n}=0,0,J${n}+M${n}/C${n})`, it.boxAtTashkent.CNY),
       f(`N${n}/${RATE_CNY}`, it.boxAtTashkent.USD),
       f(`O${n}*${RATE_UZS}`, it.boxAtTashkent.UZS),
+      // Whole product line in so'm; the column total equals the grand total in so'm.
+      f(`C${n}*P${n}`, it.boxes * it.boxAtTashkent.UZS),
     ];
     styleRow(row, 1, lastCol);
   });
@@ -157,6 +160,7 @@ export function addTruckSheet(wb: ExcelJS.Workbook, truck: TruckRow, t: Messages
   tr.getCell(8).value = sum("H", r.totalKg);
   tr.getCell(9).value = sum("I", r.khorgos.CNY);
   tr.getCell(13).value = sum("M", r.tashkent.CNY);
+  tr.getCell(17).value = sum("Q", r.grand.UZS);
   styleRow(tr, 1, lastCol, { bold: true, fill: TOTAL_FILL });
 
   ws.getRow(totalRow + 1).getCell(2).value = `${t.leftKhorgos}: ${truck.left_khorgos_at ? formatDate(truck.left_khorgos_at) : "—"}`;
@@ -231,7 +235,7 @@ export function addTruckSheet(wb: ExcelJS.Workbook, truck: TruckRow, t: Messages
   }
 
   // ── Column formats ──────────────────────────────────────────────────
-  const widths = [5, 34, 12, 12, 12, 14, 14, 15, 16, 14, 14, 16, 16, 14, 14, 16];
+  const widths = [5, 34, 12, 12, 12, 14, 14, 15, 16, 14, 14, 16, 16, 14, 14, 16, 18];
   widths.slice(0, lastCol).forEach((w, i) => (ws.getColumn(i + 1).width = w));
   for (let n = first; n <= totalRow; n++) {
     const row = ws.getRow(n);
@@ -242,7 +246,7 @@ export function addTruckSheet(wb: ExcelJS.Workbook, truck: TruckRow, t: Messages
     row.getCell(8).numFmt = KG;
     // Money columns; the so'm ones (L, P) are whole numbers.
     for (const c of [9, 10, 11, 13, 14, 15]) row.getCell(c).numFmt = MONEY;
-    for (const c of [12, 16]) row.getCell(c).numFmt = WHOLE;
+    for (const c of [12, 16, 17]) row.getCell(c).numFmt = WHOLE;
   }
   ws.views = [{ state: "frozen", ySplit: headerRow }];
 }

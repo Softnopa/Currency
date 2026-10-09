@@ -40,6 +40,7 @@ const latn = {
   expenseShare: "Xarajat ulushi",
   boxAtKhorgos: "1 korobka Xorgosda",
   boxAtTashkent: "1 korobka Toshkentda",
+  totalAtTashkentSom: "Jami Toshkentda, so'm",
 
   // Expenses
   expensesKhorgos: "Xorgosgacha va Xorgosdagi xarajatlar",
@@ -201,6 +202,7 @@ const cyrl: Messages = {
   expenseShare: "Харажат улуши",
   boxAtKhorgos: "1 коробка Хоргосда",
   boxAtTashkent: "1 коробка Тошкентда",
+  totalAtTashkentSom: "Жами Тошкентда, сўм",
 
   expensesKhorgos: "Хоргосгача ва Хоргосдаги харажатлар",
   expensesTashkent: "Хоргосдан Тошкентгача харажатлар",
