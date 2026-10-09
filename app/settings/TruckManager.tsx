@@ -9,8 +9,8 @@ import { Segmented } from "@/components/Segmented";
 export type ManagedTruck = {
   id: string;
   date: string;
-  label: string;
-  fruits: string;
+  title: string;
+  details: string;
   total: string;
   archived: boolean;
 };
@@ -98,10 +98,10 @@ export function TruckManager({ trucks }: { trucks: ManagedTruck[] }) {
                   />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-medium tabular-nums">
-                      {tr.date}
-                      {tr.label && <span className="font-normal text-muted"> · {tr.label}</span>}
+                      {tr.title}
+                      <span className="font-normal text-muted"> · {tr.date}</span>
                     </span>
-                    <span className="block truncate text-sm text-muted">{tr.fruits}</span>
+                    <span className="block truncate text-sm text-muted">{tr.details}</span>
                   </span>
                   <span className="shrink-0 text-sm font-semibold tabular-nums">{tr.total}</span>
                 </label>
@@ -120,7 +120,7 @@ export function TruckManager({ trucks }: { trucks: ManagedTruck[] }) {
                 disabled={!count || pending}
                 onClick={() => run((ids) => setTrucksArchived(ids, true))}
               >
-                📦 {t.archiveSelected}
+                📦 {t.archiveTruck}
               </button>
             ) : (
               <button
@@ -129,7 +129,7 @@ export function TruckManager({ trucks }: { trucks: ManagedTruck[] }) {
                 disabled={!count || pending}
                 onClick={() => run((ids) => setTrucksArchived(ids, false))}
               >
-                ↩️ {t.unarchiveSelected}
+                ↩️ {t.unarchiveTruck}
               </button>
             )}
             <button
@@ -151,12 +151,6 @@ export function TruckManager({ trucks }: { trucks: ManagedTruck[] }) {
         </>
       )}
 
-      <div className="border-t border-border pt-4">
-        <a href="/api/export" download className="btn-ghost">
-          📊 {t.exportExcel}
-        </a>
-        <p className="mt-2 text-sm text-muted">{t.exportHint}</p>
-      </div>
     </section>
   );
 }

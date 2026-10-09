@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { formatCount, formatDate, formatMoney } from "@/lib/format";
+import { formatAmount, formatCount, formatDate, formatMoney } from "@/lib/format";
 import { getT } from "@/lib/i18n-server";
 import { createClient } from "@/lib/supabase/server";
-import { calculateSavedTruck, listTrucks } from "@/lib/trucks";
+import { calculateSavedTruck, listTrucks, truckTitle } from "@/lib/trucks";
 
 export default async function HistoryPage({ searchParams }: PageProps<"/trucks">) {
   const showArchive = (await searchParams).archive === "1";
@@ -41,30 +41,31 @@ export default async function HistoryPage({ searchParams }: PageProps<"/trucks">
         <ul className="space-y-3">
           {trucks.map((truck) => {
             const r = calculateSavedTruck(truck);
+            const details = [truck.truck_number, truck.trailer_number].filter(Boolean).join(" · ");
             return (
               <li key={truck.id}>
                 <Link
                   href={`/trucks/${truck.id}`}
-                  className={`card flex flex-col gap-2 transition hover:border-primary/40 hover:shadow-sm sm:flex-row sm:items-center sm:justify-between ${
+                  className={`card block space-y-2 transition hover:border-primary/40 hover:shadow-sm ${
                     showArchive ? "opacity-80" : ""
                   }`}
                 >
-                  <div className="min-w-0">
-                    <div className="flex items-baseline gap-2">
-                      <span className="font-semibold tabular-nums">{formatDate(truck.arrived_at)}</span>
-                      {truck.label && <span className="truncate text-muted">{truck.label}</span>}
-                    </div>
-                    <div className="mt-0.5 text-sm text-muted">
-                      {truck.truck_items
-                        .map((it) => `${it.fruit_name} · ${formatCount(it.boxes)} ${t.boxesShort}`)
-                        .join(", ")}
-                    </div>
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+                    <span className="text-lg font-semibold">{truckTitle(truck, t.untitled)}</span>
+                    <span className="text-sm text-muted tabular-nums">{formatDate(truck.arrived_at)}</span>
                   </div>
-                  <div className="shrink-0 tabular-nums sm:text-right">
-                    <div className="text-lg font-bold text-primary">{formatMoney(r.grand.UZS, "UZS", t.som)}</div>
-                    <div className="text-sm text-muted">
-                      {formatMoney(r.grand.USD, "USD", t.som)} · {formatMoney(r.grand.CNY, "CNY", t.som)}
-                    </div>
+                  {details && <div className="text-sm text-muted">🚚 {details}</div>}
+                  <div className="line-clamp-2 text-sm text-muted">
+                    {truck.truck_items.map((it) => it.fruit_name).join(", ")}
+                  </div>
+                  <div className="flex flex-wrap items-end justify-between gap-2 border-t border-border pt-2 tabular-nums">
+                    <span className="text-sm text-muted">
+                      {formatCount(r.totalBoxes)} {t.boxesShort} · {formatAmount(r.totalKg)} {t.kg}
+                    </span>
+                    <span className="text-right">
+                      <span className="block text-lg font-bold text-primary">{formatMoney(r.grand.CNY, "CNY", t.som)}</span>
+                      <span className="block text-sm text-muted">{formatMoney(r.grand.UZS, "UZS", t.som)}</span>
+                    </span>
                   </div>
                 </Link>
               </li>

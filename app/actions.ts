@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { CURRENCIES, type Currency } from "@/lib/calc";
+import { CURRENCIES, STAGES, type Currency, type Stage } from "@/lib/calc";
 import { LANG_COOKIE, parseLang, type ErrorKey } from "@/lib/i18n";
 import { parsePrefs, PREFS_COOKIE, type Prefs } from "@/lib/prefs";
 import { createClient } from "@/lib/supabase/server";
@@ -37,35 +37,66 @@ export async function setLang(lang: string) {
 
 export type TruckPayload = {
   id: string | null;
+  batchName: string;
   arrivedAt: string;
-  label: string;
-  expenseAmount: number;
-  expenseCurrency: Currency;
+  truckNumber: string;
+  trailerNumber: string;
+  driverPhone: string;
+  leftKhorgosAt: string;
+  enteredTashkentAt: string;
+  goodsPaidUsd: number;
+  notes: string;
   usdCny: number;
   usdUzs: number;
-  items: { fruitName: string; boxes: number; pricePerBoxCny: number }[];
+  items: { name: string; boxes: number; kgPerBox: number; piecesPerBox: number | null; priceCny: number }[];
+  expenses: { stage: Stage; name: string; note: string; amount: number; currency: Currency }[];
 };
 
-export type SaveResult = { ok: true; id: string } | { ok: false, error: ErrorKey };
+export type SaveResult = { ok: true; id: string } | { ok: false; error: ErrorKey };
 
 const isPositive = (n: unknown) => typeof n === "number" && Number.isFinite(n) && n > 0;
 const isNonNegative = (n: unknown) => typeof n === "number" && Number.isFinite(n) && n >= 0;
+const isText = (v: unknown, max: number) => typeof v === "string" && v.length <= max;
+const isDate = (v: unknown) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
+const isOptionalDate = (v: unknown) => v === "" || isDate(v);
 
 function validate(p: TruckPayload): ErrorKey | null {
-  if (!Array.isArray(p.items) || p.items.length === 0 || p.items.length > 100) return "errNoItems";
+  if (!Array.isArray(p.items) || p.items.length === 0 || p.items.length > 200) return "errNoItems";
   const itemsOk = p.items.every(
     (it) =>
-      typeof it.fruitName === "string" &&
-      it.fruitName.trim().length > 0 &&
-      it.fruitName.length <= 80 &&
+      isText(it.name, 80) &&
+      it.name.trim().length > 0 &&
       Number.isInteger(it.boxes) &&
       it.boxes > 0 &&
-      isNonNegative(it.pricePerBoxCny),
+      isNonNegative(it.kgPerBox) &&
+      (it.piecesPerBox === null || (Number.isInteger(it.piecesPerBox) && it.piecesPerBox > 0)) &&
+      isNonNegative(it.priceCny),
   );
   if (!itemsOk) return "errBadNumber";
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(p.arrivedAt)) return "errBadNumber";
-  if (!CURRENCIES.includes(p.expenseCurrency)) return "errBadNumber";
-  if (!isNonNegative(p.expenseAmount) || !isPositive(p.usdCny) || !isPositive(p.usdUzs)) return "errBadNumber";
+
+  const expensesOk =
+    Array.isArray(p.expenses) &&
+    p.expenses.length <= 200 &&
+    p.expenses.every(
+      (e) =>
+        STAGES.includes(e.stage) &&
+        isText(e.name, 80) &&
+        e.name.trim().length > 0 &&
+        isText(e.note, 80) &&
+        isNonNegative(e.amount) &&
+        CURRENCIES.includes(e.currency),
+    );
+  if (!expensesOk) return "errBadNumber";
+
+  const textOk =
+    isText(p.batchName, 100) &&
+    isText(p.truckNumber, 40) &&
+    isText(p.trailerNumber, 40) &&
+    isText(p.driverPhone, 40) &&
+    isText(p.notes, 2000);
+  const datesOk = isDate(p.arrivedAt) && isOptionalDate(p.leftKhorgosAt) && isOptionalDate(p.enteredTashkentAt);
+  if (!textOk || !datesOk) return "errBadNumber";
+  if (!isNonNegative(p.goodsPaidUsd) || !isPositive(p.usdCny) || !isPositive(p.usdUzs)) return "errBadNumber";
   return null;
 }
 
@@ -74,29 +105,43 @@ export async function saveTruck(payload: TruckPayload): Promise<SaveResult> {
   if (error) return { ok: false, error };
 
   const supabase = await createClient();
-  const { data, error: dbError } = await supabase.rpc("save_truck", {
+  const { data, error: dbError } = await supabase.rpc("save_truck_v2", {
     p_id: payload.id,
     p_truck: {
+      batch_name: payload.batchName.trim(),
       arrived_at: payload.arrivedAt,
-      label: String(payload.label ?? "").trim().slice(0, 100),
-      expense_amount: payload.expenseAmount,
-      expense_currency: payload.expenseCurrency,
+      truck_number: payload.truckNumber.trim(),
+      trailer_number: payload.trailerNumber.trim(),
+      driver_phone: payload.driverPhone.trim(),
+      left_khorgos_at: payload.leftKhorgosAt,
+      entered_tashkent_at: payload.enteredTashkentAt,
+      goods_paid_usd: payload.goodsPaidUsd,
+      notes: payload.notes.trim(),
       usd_cny: payload.usdCny,
       usd_uzs: payload.usdUzs,
     },
     p_items: payload.items.map((it) => ({
-      fruit_name: it.fruitName.trim(),
+      fruit_name: it.name.trim(),
       boxes: it.boxes,
-      price_per_box_cny: it.pricePerBoxCny,
+      kg_per_box: it.kgPerBox,
+      pieces_per_box: it.piecesPerBox,
+      price_per_box_cny: it.priceCny,
+    })),
+    p_expenses: payload.expenses.map((e) => ({
+      stage: e.stage,
+      name: e.name.trim(),
+      note: e.note.trim(),
+      amount: e.amount,
+      currency: e.currency,
     })),
   });
 
   if (dbError || typeof data !== "string") {
-    console.error("save_truck failed:", dbError);
+    console.error("save_truck_v2 failed:", dbError);
     return { ok: false, error: "errSave" };
   }
 
-  revalidatePath("/trucks");
+  revalidatePath("/", "layout");
   return { ok: true, id: data };
 }
 

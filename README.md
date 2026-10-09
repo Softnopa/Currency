@@ -33,20 +33,22 @@ Open http://localhost:3000 and log in.
 
 If you ran `schema.sql` before a feature was added, run the matching file from [supabase/migrations/](supabase/migrations/) in the SQL Editor once:
 
-- [002_archive.sql](supabase/migrations/002_archive.sql) — archive for trucks (Settings → Ma'lumotlar).
+- [002_archive.sql](supabase/migrations/002_archive.sql) — archive for trucks.
+- [003_full_sheet.sql](supabase/migrations/003_full_sheet.sql) — full Excel-sheet layout: truck details, kg per box, two expense sections, goods paid in $.
 
 ## Settings page (⚙️ Sozlamalar)
 
-- **Ko'rinish:** theme colour, light/dark/auto mode, font size, language. Saved per device (phone and computer can differ).
-- **Hisob-kitob:** which currency the expenses field starts with.
-- **Ma'lumotlar:** tick trucks to archive, restore or delete; download everything as a CSV that opens in Excel.
+- **Mavzu:** 8 colour themes (including Excel green), light/dark/auto mode, font size, language. Saved per device.
+- **Excel:** download every truck as an .xlsx file — a summary sheet plus one sheet per truck in the original layout.
+- **Mashinalarni boshqarish:** tick trucks to archive, restore or delete.
 - **Hisob:** change password, log out.
 
-## How the numbers are calculated
+## How the numbers are calculated (same as the Excel sheet)
 
-- Fruit row: `boxes × price per box (¥)` → ÷ (¥ per $) → × (so'm per $).
-- Expenses are entered in ¥, $ or so'm and converted the same way.
-- **Cost of 1 box** = fruit price per box + (all expenses ÷ total boxes in the truck).
-- Each saved truck keeps the rate it was saved with, so old trucks don't change when the rate changes. Open a truck and press "Bugungi kursni qo'yish" to switch it to today's rate.
-- Rates can be typed by hand (for example, the market rate instead of the bank rate).
-# Currency
+- Product: `boxes × price per box in Urumqi (¥)` = total ¥; `boxes × kg per box` = total kg.
+- Expenses come in two sections — up to/at Khorgos, and Khorgos → Tashkent. Each line can be in ¥, $ or so'm and is converted to ¥ with the truck's rate.
+- Each section is **split between products by kg** (a product's kg ÷ all kg). If some product has no kg, box count is used instead.
+- **1 box at Khorgos** = Urumqi price + Khorgos share ÷ boxes. **1 box in Tashkent** = Khorgos price + Tashkent share ÷ boxes.
+- Goods money paid in $ is converted to ¥; the rest is what is paid in ¥.
+- Each saved truck keeps its own rate (1 $ = ¥ and 1 $ = so'm); "Bugungi kursni qo'yish" switches it to today's bank rate.
+- Every truck can be downloaded as Excel with live formulas, laid out like the original sheet.

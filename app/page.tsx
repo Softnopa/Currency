@@ -1,18 +1,17 @@
-import { TruckForm } from "@/components/TruckForm";
+import { TruckForm } from "@/components/truck-form/TruckForm";
 import { rateToInput, todayInTashkent } from "@/lib/format";
-import { getPrefs, getT } from "@/lib/i18n-server";
+import { getT } from "@/lib/i18n-server";
 import { getLatestRates } from "@/lib/rates";
 import { createClient } from "@/lib/supabase/server";
-import { listFruitNames } from "@/lib/trucks";
+import { listSuggestions } from "@/lib/trucks";
 
 export default async function NewTruckPage() {
   const supabase = await createClient();
-  const [t, prefs, rates, fruitNames] = await Promise.all([
-    getT(),
-    getPrefs(),
-    getLatestRates(supabase),
-    listFruitNames(supabase),
-  ]);
+  const [t, rates, suggestions] = await Promise.all([getT(), getLatestRates(supabase), listSuggestions(supabase)]);
+
+  // Start with the usual expense names so only the amounts need typing.
+  const preset = (stage: "khorgos" | "tashkent", names: string[]) =>
+    names.map((name) => ({ stage, name, note: "", amount: "", currency: "CNY" as const }));
 
   return (
     <>
@@ -20,13 +19,25 @@ export default async function NewTruckPage() {
       <TruckForm
         truckId={null}
         todayRates={rates}
-        fruitNames={fruitNames}
+        productNames={suggestions.productNames}
+        expenseNames={suggestions.expenseNames}
         initial={{
-          arrivedAt: todayInTashkent(),
-          label: "",
-          rows: [],
-          expenseAmount: "",
-          expenseCurrency: prefs.expenseCurrency,
+          info: {
+            batchName: "",
+            arrivedAt: todayInTashkent(),
+            truckNumber: "",
+            trailerNumber: "",
+            driverPhone: "",
+            leftKhorgosAt: "",
+            enteredTashkentAt: "",
+            notes: "",
+          },
+          products: [],
+          expenses: [
+            ...preset("khorgos", t.defaultKhorgosExpenses),
+            ...preset("tashkent", t.defaultTashkentExpenses),
+          ],
+          goodsPaidUsd: "",
           usdCny: rates ? rateToInput(rates.usdCny, 4) : "",
           usdUzs: rates ? rateToInput(rates.usdUzs, 2) : "",
         }}

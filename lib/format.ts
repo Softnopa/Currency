@@ -1,19 +1,22 @@
 import type { Currency } from "./calc";
 
 const whole = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 0 });
-const cents = new Intl.NumberFormat("ru-RU", {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
+// Like the Excel sheet: ¥218 731 and ¥127,42 — decimals only when there are any.
+const upTo2 = new Intl.NumberFormat("ru-RU", { maximumFractionDigits: 2 });
 
 export function formatMoney(value: number, currency: Currency, somLabel: string): string {
   if (currency === "UZS") return `${whole.format(value)} ${somLabel}`;
-  if (currency === "USD") return `$${cents.format(value)}`;
-  return `¥${cents.format(value)}`;
+  if (currency === "USD") return `$${upTo2.format(value)}`;
+  return `¥${upTo2.format(value)}`;
 }
 
 export function formatCount(value: number): string {
   return whole.format(value);
+}
+
+/** Weights and other quantities: up to 2 decimals. */
+export function formatAmount(value: number): string {
+  return upTo2.format(value);
 }
 
 /** Rate shown in an input: enough precision to be exact, no float noise. */
