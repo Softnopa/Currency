@@ -1,6 +1,6 @@
 import "server-only";
 import ExcelJS from "exceljs";
-import type { Currency, Stage } from "./calc";
+import { DEFAULT_EXPENSE_CURRENCY, type Currency, type Stage } from "./calc";
 import { formatDate } from "./format";
 import type { Messages } from "./i18n";
 import { calculateSavedTruck, truckTitle, type TruckRow } from "./trucks";
@@ -43,7 +43,7 @@ type ExpenseLine = { name: string; note: string; amount: number | null; currency
 function expenseLines(truck: TruckRow, stage: Stage, defaults: string[]): ExpenseLine[] {
   const saved = truck.truck_expenses.filter((e) => e.stage === stage);
   if (saved.length) return saved;
-  return defaults.map((name) => ({ name, note: "", amount: null, currency: "CNY" }));
+  return defaults.map((name) => ({ name, note: "", amount: null, currency: DEFAULT_EXPENSE_CURRENCY[stage] }));
 }
 
 function toCnyValue(amount: number, currency: Currency, truck: TruckRow) {

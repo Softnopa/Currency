@@ -5,6 +5,9 @@ export type Currency = (typeof CURRENCIES)[number];
 export const STAGES = ["khorgos", "tashkent"] as const;
 export type Stage = (typeof STAGES)[number];
 
+/** Currency new expense lines start with: Khorgos costs are paid in ¥, Frag/Rastamoshka in $. */
+export const DEFAULT_EXPENSE_CURRENCY: Record<Stage, Currency> = { khorgos: "CNY", tashkent: "USD" };
+
 /** Rates are expressed against 1 US dollar, the way traders quote them. */
 export type Rates = {
   usdCny: number; // 1 $ = X ¥

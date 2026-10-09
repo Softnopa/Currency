@@ -3,7 +3,7 @@
 import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { saveTruck, type TruckPayload } from "@/app/actions";
-import { calculateShipment, parseNumber, type Money, type Stage } from "@/lib/calc";
+import { calculateShipment, DEFAULT_EXPENSE_CURRENCY, parseNumber, type Money, type Stage } from "@/lib/calc";
 import { formatAmount, formatCount, formatDate, formatMoney, rateToInput } from "@/lib/format";
 import type { ErrorKey } from "@/lib/i18n";
 import { useT } from "../LangProvider";
@@ -124,7 +124,7 @@ export function TruckForm({
   };
   const addExpense = (stage: Stage) => {
     touch();
-    setExpenses([...expenses, { key: nextKey.current++, stage, name: "", note: "", amount: "", currency: "CNY" }]);
+    setExpenses([...expenses, { key: nextKey.current++, stage, name: "", note: "", amount: "", currency: DEFAULT_EXPENSE_CURRENCY[stage] }]);
   };
 
   function handleSave() {
