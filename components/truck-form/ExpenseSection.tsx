@@ -37,8 +37,16 @@ export function ExpenseSection({
     <section className="card space-y-3">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-base font-semibold">{title}</h2>
-        <span className="text-lg font-bold tabular-nums text-primary">
-          {t.total}: {formatMoney(totalCny, "CNY", t.som)}
+        <span className="text-right tabular-nums">
+          <span className="block text-lg font-bold text-primary">
+            {t.total}: {formatMoney(totalCny, "CNY", t.som)}
+          </span>
+          {totalCny > 0 && (
+            <span className="block text-sm text-muted">
+              {formatMoney(convert(totalCny, "CNY", rates).USD, "USD", t.som)} ·{" "}
+              {formatMoney(convert(totalCny, "CNY", rates).UZS, "UZS", t.som)}
+            </span>
+          )}
         </span>
       </div>
 
@@ -101,9 +109,12 @@ export function ExpenseSection({
                     </button>
                   ))}
                 </div>
-                {row.currency !== "CNY" && amount > 0 && (
+                {amount > 0 && (
                   <span className="text-sm text-muted tabular-nums">
-                    = {formatMoney(convert(amount, row.currency, rates).CNY, "CNY", t.som)}
+                    ={" "}
+                    {CURRENCIES.filter((c) => c !== row.currency)
+                      .map((c) => formatMoney(convert(amount, row.currency, rates)[c], c, t.som))
+                      .join(" · ")}
                   </span>
                 )}
               </div>

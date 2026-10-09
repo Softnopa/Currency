@@ -37,6 +37,21 @@ function sheetName(wb: ExcelJS.Workbook, wanted: string) {
   return name;
 }
 
+type ExpenseLine = { name: string; note: string; amount: number | null; currency: Currency };
+
+/** Saved lines of a section; if there are none, the usual names with empty amounts to fill in Excel. */
+function expenseLines(truck: TruckRow, stage: Stage, defaults: string[]): ExpenseLine[] {
+  const saved = truck.truck_expenses.filter((e) => e.stage === stage);
+  if (saved.length) return saved;
+  return defaults.map((name) => ({ name, note: "", amount: null, currency: "CNY" }));
+}
+
+function toCnyValue(amount: number, currency: Currency, truck: TruckRow) {
+  if (currency === "USD") return amount * truck.usd_cny;
+  if (currency === "UZS") return (amount * truck.usd_cny) / truck.usd_uzs;
+  return amount;
+}
+
 /**
  * One truck laid out like the father's Excel sheet: header, product table,
  * then the expense tables. Totals are real formulas, so editing a number in
@@ -44,9 +59,8 @@ function sheetName(wb: ExcelJS.Workbook, wanted: string) {
  */
 export function addTruckSheet(wb: ExcelJS.Workbook, truck: TruckRow, t: Messages) {
   const r = calculateSavedTruck(truck);
-  const hasTashkent = r.tashkent.CNY > 0;
   const ws = wb.addWorksheet(sheetName(wb, `${formatDate(truck.arrived_at)} ${truckTitle(truck, t.untitled)}`));
-  const lastCol = hasTashkent ? 16 : 12;
+  const lastCol = 16;
 
   // ── Title and rates ─────────────────────────────────────────────────
   const title = [
@@ -86,14 +100,10 @@ export function addTruckSheet(wb: ExcelJS.Workbook, truck: TruckRow, t: Messages
     `${t.boxAtKhorgos}, ¥`,
     `${t.boxAtKhorgos}, $`,
     `${t.boxAtKhorgos}, ${t.som}`,
-    ...(hasTashkent
-      ? [
-          `${t.expenseShare} (${t.tashkentExpenses}), ¥`,
-          `${t.boxAtTashkent}, ¥`,
-          `${t.boxAtTashkent}, $`,
-          `${t.boxAtTashkent}, ${t.som}`,
-        ]
-      : []),
+    `${t.expenseShare} (${t.tashkentExpenses}), ¥`,
+    `${t.boxAtTashkent}, ¥`,
+    `${t.boxAtTashkent}, $`,
+    `${t.boxAtTashkent}, ${t.som}`,
   ];
   const hr = ws.getRow(headerRow);
   hr.values = headers;
@@ -106,11 +116,11 @@ export function addTruckSheet(wb: ExcelJS.Workbook, truck: TruckRow, t: Messages
   const totalRow = last + 1;
   // Rows where the expense tables' totals will be, needed by the share formulas.
   const khorgosStart = totalRow + 5;
-  const khorgosRows = truck.truck_expenses.filter((e) => e.stage === "khorgos").length;
-  const khorgosTotalRow = khorgosStart + 1 + khorgosRows;
+  const khorgosLines = expenseLines(truck, "khorgos", t.defaultKhorgosExpenses);
+  const khorgosTotalRow = khorgosStart + 1 + khorgosLines.length;
   const tashkentStart = khorgosTotalRow + 4;
-  const tashkentRows = truck.truck_expenses.filter((e) => e.stage === "tashkent").length;
-  const tashkentTotalRow = tashkentStart + 1 + tashkentRows;
+  const tashkentLines = expenseLines(truck, "tashkent", t.defaultTashkentExpenses);
+  const tashkentTotalRow = tashkentStart + 1 + tashkentLines.length;
   // Split by kg like the sheet, or by boxes when weights are missing.
   const weightCol = r.allocation === "kg" ? "H" : "C";
 
@@ -131,14 +141,10 @@ export function addTruckSheet(wb: ExcelJS.Workbook, truck: TruckRow, t: Messages
       f(`IF(C${n}=0,0,F${n}+I${n}/C${n})`, it.boxAtKhorgos.CNY),
       f(`J${n}/${RATE_CNY}`, it.boxAtKhorgos.USD),
       f(`K${n}*${RATE_UZS}`, it.boxAtKhorgos.UZS),
-      ...(hasTashkent
-        ? [
-            f(share(`$F$${tashkentTotalRow}`), it.shareTashkentCny),
-            f(`IF(C${n}=0,0,J${n}+M${n}/C${n})`, it.boxAtTashkent.CNY),
-            f(`N${n}/${RATE_CNY}`, it.boxAtTashkent.USD),
-            f(`O${n}*${RATE_UZS}`, it.boxAtTashkent.UZS),
-          ]
-        : []),
+      f(share(`$F$${tashkentTotalRow}`), it.shareTashkentCny),
+      f(`IF(C${n}=0,0,J${n}+M${n}/C${n})`, it.boxAtTashkent.CNY),
+      f(`N${n}/${RATE_CNY}`, it.boxAtTashkent.USD),
+      f(`O${n}*${RATE_UZS}`, it.boxAtTashkent.UZS),
     ];
     styleRow(row, 1, lastCol);
   });
@@ -150,7 +156,7 @@ export function addTruckSheet(wb: ExcelJS.Workbook, truck: TruckRow, t: Messages
   tr.getCell(7).value = sum("G", r.goods.CNY);
   tr.getCell(8).value = sum("H", r.totalKg);
   tr.getCell(9).value = sum("I", r.khorgos.CNY);
-  if (hasTashkent) tr.getCell(13).value = sum("M", r.tashkent.CNY);
+  tr.getCell(13).value = sum("M", r.tashkent.CNY);
   styleRow(tr, 1, lastCol, { bold: true, fill: TOTAL_FILL });
 
   ws.getRow(totalRow + 1).getCell(2).value = `${t.leftKhorgos}: ${truck.left_khorgos_at ? formatDate(truck.left_khorgos_at) : "—"}`;
@@ -158,66 +164,74 @@ export function addTruckSheet(wb: ExcelJS.Workbook, truck: TruckRow, t: Messages
     `${t.enteredTashkent}: ${truck.entered_tashkent_at ? formatDate(truck.entered_tashkent_at) : "—"}`;
   ws.getRow(totalRow + 2).getCell(2).font = { bold: true, color: { argb: "FFC00000" } };
 
-  // ── Expense tables ──────────────────────────────────────────────────
-  const toCnyFormula = (n: number, currency: Currency) =>
-    currency === "CNY" ? `D${n}` : currency === "USD" ? `D${n}*${RATE_CNY}` : `D${n}*${RATE_CNY}/${RATE_UZS}`;
+  // ── Expense tables: ¥ in F, then $ in G and so'm in H ───────────────
+  /** Writes ¥ (formula) into F and its $ / so'm conversions into G and H. */
+  const moneyCells = (n: number, cnyFormula: string, cny: number) => {
+    const row = ws.getRow(n);
+    row.getCell(6).value = f(cnyFormula, cny);
+    row.getCell(7).value = f(`F${n}/${RATE_CNY}`, cny / truck.usd_cny);
+    row.getCell(8).value = f(`G${n}*${RATE_UZS}`, (cny / truck.usd_cny) * truck.usd_uzs);
+  };
+  // The currency symbol in column E decides the conversion, so it can be changed in Excel.
+  const toCny = (n: number) =>
+    `IF(E${n}="$",D${n}*${RATE_CNY},IF(E${n}="${t.som}",D${n}*${RATE_CNY}/${RATE_UZS},D${n}))`;
 
-  const expenseTable = (stage: Stage, start: number, totalAt: number, heading: string, totalCny: number) => {
+  const expenseTable = (start: number, totalAt: number, heading: string, lines: ExpenseLine[], totalCny: number) => {
     const head = ws.getRow(start);
-    head.values = [t.number, `${heading} — ${t.expenseName}`, t.expenseNote, t.amount, "", "¥"];
-    styleRow(head, 1, 6, { bold: true, fill: HEADER_FILL });
-    truck.truck_expenses
-      .filter((e) => e.stage === stage)
-      .forEach((e, i) => {
-        const n = start + 1 + i;
-        const row = ws.getRow(n);
-        const symbol = e.currency === "CNY" ? "¥" : e.currency === "USD" ? "$" : t.som;
-        const cny = e.currency === "CNY" ? e.amount : e.currency === "USD" ? e.amount * truck.usd_cny : (e.amount * truck.usd_cny) / truck.usd_uzs;
-        row.values = [i + 1, e.name, e.note, e.amount, symbol, f(toCnyFormula(n, e.currency), cny)];
-        styleRow(row, 1, 6);
-      });
+    head.values = [t.number, `${heading} — ${t.expenseName}`, t.expenseNote, t.amount, "", "¥", "$", t.som];
+    styleRow(head, 1, 8, { bold: true, fill: HEADER_FILL });
+    lines.forEach((e, i) => {
+      const n = start + 1 + i;
+      const row = ws.getRow(n);
+      row.values = [i + 1, e.name, e.note, e.amount, e.currency === "CNY" ? "¥" : e.currency === "USD" ? "$" : t.som];
+      moneyCells(n, toCny(n), toCnyValue(e.amount ?? 0, e.currency, truck));
+      styleRow(row, 1, 8);
+    });
     const total = ws.getRow(totalAt);
     total.getCell(2).value = t.total;
-    total.getCell(6).value = totalAt > start + 1 ? f(`SUM(F${start + 1}:F${totalAt - 1})`, totalCny) : 0;
-    styleRow(total, 1, 6, { bold: true, fill: TOTAL_FILL });
+    moneyCells(totalAt, lines.length ? `SUM(F${start + 1}:F${totalAt - 1})` : "0", totalCny);
+    styleRow(total, 1, 8, { bold: true, fill: TOTAL_FILL });
   };
 
-  expenseTable("khorgos", khorgosStart, khorgosTotalRow, t.expensesKhorgos, r.khorgos.CNY);
-  const goodsRow = ws.getRow(khorgosTotalRow + 1);
-  goodsRow.getCell(2).value = t.goodsMoney;
-  goodsRow.getCell(6).value = f(`G${totalRow}`, r.goods.CNY);
-  if (truck.goods_paid_usd > 0) {
-    goodsRow.getCell(3).value = `$${truck.goods_paid_usd}`;
-  }
-  const toKhorgosRow = ws.getRow(khorgosTotalRow + 2);
-  toKhorgosRow.getCell(2).value = t.toKhorgosTotal;
-  toKhorgosRow.getCell(6).value = f(`F${khorgosTotalRow}+F${khorgosTotalRow + 1}`, r.toKhorgos.CNY);
-  toKhorgosRow.getCell(6).font = { bold: true, color: { argb: "FFC00000" } };
-  styleRow(goodsRow, 1, 6);
-  styleRow(toKhorgosRow, 1, 6, { bold: true });
-  toKhorgosRow.getCell(6).font = { bold: true, color: { argb: "FFC00000" } };
+  expenseTable(khorgosStart, khorgosTotalRow, t.expensesKhorgos, khorgosLines, r.khorgos.CNY);
 
-  expenseTable("tashkent", tashkentStart, tashkentTotalRow, t.expensesTashkent, r.tashkent.CNY);
+  const goodsAt = khorgosTotalRow + 1;
+  ws.getRow(goodsAt).getCell(2).value = t.goodsMoney;
+  if (truck.goods_paid_usd > 0) ws.getRow(goodsAt).getCell(3).value = `$${truck.goods_paid_usd}`;
+  moneyCells(goodsAt, `G${totalRow}`, r.goods.CNY);
+  styleRow(ws.getRow(goodsAt), 1, 8);
+
+  const toKhorgosAt = khorgosTotalRow + 2;
+  ws.getRow(toKhorgosAt).getCell(2).value = t.toKhorgosTotal;
+  moneyCells(toKhorgosAt, `F${khorgosTotalRow}+F${goodsAt}`, r.toKhorgos.CNY);
+  styleRow(ws.getRow(toKhorgosAt), 1, 8, { bold: true });
+  for (const c of [6, 7, 8]) ws.getRow(toKhorgosAt).getCell(c).font = { bold: true, color: { argb: "FFC00000" } };
+
+  expenseTable(tashkentStart, tashkentTotalRow, t.expensesTashkent, tashkentLines, r.tashkent.CNY);
 
   const grandAt = tashkentTotalRow + 2;
-  const grand = (offset: number, label: string, formula: string, result: number, fmt: string) => {
-    const row = ws.getRow(grandAt + offset);
-    row.getCell(2).value = label;
-    row.getCell(6).value = f(formula, result);
-    row.getCell(6).numFmt = fmt;
-    styleRow(row, 1, 6, { bold: true, fill: TOTAL_FILL });
-  };
-  const grandCny = `F${khorgosTotalRow + 2}+F${tashkentTotalRow}`;
-  grand(0, `${t.grandTotal}, ¥`, grandCny, r.grand.CNY, MONEY);
-  grand(1, `${t.grandTotal}, $`, `(${grandCny})/${RATE_CNY}`, r.grand.USD, MONEY);
-  grand(2, `${t.grandTotal}, ${t.som}`, `(${grandCny})/${RATE_CNY}*${RATE_UZS}`, r.grand.UZS, WHOLE);
+  const grandHead = ws.getRow(grandAt);
+  grandHead.getCell(2).value = t.grandTotal;
+  grandHead.getCell(6).value = "¥";
+  grandHead.getCell(7).value = "$";
+  grandHead.getCell(8).value = t.som;
+  styleRow(grandHead, 1, 8, { bold: true, fill: HEADER_FILL });
+  ws.getRow(grandAt + 1).getCell(2).value = `${t.toKhorgosTotal} + ${t.tashkentExpenses}`;
+  moneyCells(grandAt + 1, `F${toKhorgosAt}+F${tashkentTotalRow}`, r.grand.CNY);
+  styleRow(ws.getRow(grandAt + 1), 1, 8, { bold: true, fill: TOTAL_FILL });
+
+  for (let n = khorgosStart; n <= grandAt + 1; n++) {
+    const row = ws.getRow(n);
+    for (const c of [4, 6, 7]) row.getCell(c).numFmt = MONEY;
+    row.getCell(8).numFmt = WHOLE;
+  }
 
   if (truck.notes) {
-    ws.getRow(grandAt + 4).getCell(2).value = `${t.notes}: ${truck.notes}`;
+    ws.getRow(grandAt + 3).getCell(2).value = `${t.notes}: ${truck.notes}`;
   }
 
   // ── Column formats ──────────────────────────────────────────────────
-  const widths = [5, 28, 12, 12, 12, 14, 14, 12, 16, 14, 14, 16, 16, 14, 14, 16];
+  const widths = [5, 34, 12, 12, 12, 14, 14, 15, 16, 14, 14, 16, 16, 14, 14, 16];
   widths.slice(0, lastCol).forEach((w, i) => (ws.getColumn(i + 1).width = w));
   for (let n = first; n <= totalRow; n++) {
     const row = ws.getRow(n);
@@ -229,10 +243,6 @@ export function addTruckSheet(wb: ExcelJS.Workbook, truck: TruckRow, t: Messages
     // Money columns; the so'm ones (L, P) are whole numbers.
     for (const c of [9, 10, 11, 13, 14, 15]) row.getCell(c).numFmt = MONEY;
     for (const c of [12, 16]) row.getCell(c).numFmt = WHOLE;
-  }
-  for (let n = khorgosStart; n <= tashkentTotalRow; n++) {
-    ws.getRow(n).getCell(4).numFmt = MONEY;
-    ws.getRow(n).getCell(6).numFmt = MONEY;
   }
   ws.views = [{ state: "frozen", ySplit: headerRow }];
 }

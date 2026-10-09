@@ -61,7 +61,7 @@ const latn = {
     "Muravey",
     "Ish haqqi",
   ],
-  defaultTashkentExpenses: ["Frak Toshkentgacha", "Bojxona", "Tushirish puli"],
+  defaultTashkentExpenses: ["Frag", "Rastamoshka"],
 
   // Goods payment
   goodsPayment: "Tovar puli to'lovi",
@@ -221,7 +221,7 @@ const cyrl: Messages = {
     "Муравей",
     "Иш ҳаққи",
   ],
-  defaultTashkentExpenses: ["Фрак Тошкентгача", "Божхона", "Тушириш пули"],
+  defaultTashkentExpenses: ["Фраг", "Растаможка"],
 
   goodsPayment: "Товар пули тўлови",
   goodsMoney: "Товар пули",
